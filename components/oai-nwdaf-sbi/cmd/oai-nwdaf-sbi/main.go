@@ -36,11 +36,15 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	sbi "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/sbi"
+
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 type MainConfig struct {
 	Server struct {
-		Addr string `envconfig:"SERVER_ADDR"`
+		Addr    string `envconfig:"SERVER_ADDR"`
+		Version int    `envconfig:"SERVER_HTTP_VERSION"`
 	}
 }
 
@@ -59,7 +63,15 @@ func main() {
 	// Initialize internal package
 	sbi.InitConfig()
 	// Create router
+
 	router := sbi.NewRouter()
+
+	// Initialize HTTP2 Over ClearText Server if needed
+	if config.Server.Version == 2 {
+		h2s := &http2.Server{}
+		router = h2c.NewHandler(router, h2s)
+	}
+
 	server := &http.Server{
 		Addr:         config.Server.Addr,
 		Handler:      router,
