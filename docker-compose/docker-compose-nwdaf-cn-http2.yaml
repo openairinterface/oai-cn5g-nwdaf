@@ -66,7 +66,7 @@ services:
             test: netstat -ltn | grep -c 8080
             interval: 5s
             timeout: 2s
-            retries: 15  
+            retries: 15
         networks:
             nwdaf_net:
                 ipv4_address: 192.168.74.151
@@ -82,7 +82,7 @@ services:
             - ENGINE_UE_MOBILITY_ROUTE=/ue_mobility
             - ENGINE_UNEXPECTED_LARGE_RATE_FLOW_ROUTE=/abnormal_behaviour/unexpected_large_rate_flow
             - SERVER_ADDR=0.0.0.0:8080
-        ports: 
+        ports:
             - "6060:8080"
         healthcheck:
             test: netstat -ltn | grep -c 8080
@@ -97,7 +97,7 @@ services:
         image: oai-nwdaf-nbi-ml:latest
         environment:
             - SERVER_ADDR=0.0.0.0:8080
-        ports: 
+        ports:
             - "6061:8080"
         healthcheck:
             test: netstat -ltn | grep -c 8080
@@ -198,6 +198,8 @@ services:
             - MONGODB_COLLECTION_NAME_SMF=smf
             - EVENT_NOTIFY_URI=http://192.168.70.158:8080
             - SERVER_ADDR=0.0.0.0:8080
+            # Configure this parameter to enable HTTP2 Callbacks handler
+            - SERVER_HTTP_VERSION=2
         ports:
             - "6062:8080"
         depends_on:
