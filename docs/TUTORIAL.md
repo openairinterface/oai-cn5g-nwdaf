@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 <table style="border-collapse: collapse; border: none;">
   <tr style="border-collapse: collapse; border: none;">
     <td style="border-collapse: collapse; border: none;">
@@ -100,7 +102,7 @@ docker build --network=host --no-cache  \
 ### 1.7. Pull required images
 
 ```bash
-docker pull mongo 
+docker pull mongo
 docker pull kong
 ```
 
@@ -271,11 +273,11 @@ To stop `NWDAF`, run:
 # Make sure you are in the oai-nwdaf project repository
 cd ../../oai-cn5g-nwdaf
 
-# Stop NWDAF if AMF/SMF HTTP version is 1 
+# Stop NWDAF if AMF/SMF HTTP version is 1
 docker-compose -f docker-compose/docker-compose-nwdaf-cn-http1.yaml down
 ```
 ```bash
-# Stop NWDAF if AMF/SMF HTTP version is 2 
+# Stop NWDAF if AMF/SMF HTTP version is 2
 docker-compose -f docker-compose/docker-compose-nwdaf-cn-http2.yaml down
 ```
 

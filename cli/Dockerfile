@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: LicenseRef-CSSL-1.0
+
 FROM python:3.6.9-slim AS nwdaf-cli
 
 COPY ./requirements.txt /tmp
