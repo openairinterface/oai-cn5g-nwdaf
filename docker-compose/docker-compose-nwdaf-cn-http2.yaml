@@ -120,7 +120,7 @@ services:
         depends_on:
             - oai-nwdaf-database
         healthcheck:
-            test: netstat -ltn | grep -c 8080
+            test: ["CMD", "python3", "-c", "import socket; s = socket.create_connection(('127.0.0.1', 8080), 2); s.close()"]
             interval: 5s
             timeout: 2s
             retries: 15
@@ -170,7 +170,7 @@ services:
             - MONGODB_DATABASE_NAME=testing
             - MONGODB_COLLECTION_NAME_AMF=amf
             - MONGODB_COLLECTION_NAME_SMF=smf
-            - EVENT_NOTIFY_URI=http://192.168.70.158:8080
+            - EVENT_NOTIFY_URI=http://oai-nwdaf-sbi:8080
             - SERVER_ADDR=0.0.0.0:8080
         ports:
             - "6062:8080"

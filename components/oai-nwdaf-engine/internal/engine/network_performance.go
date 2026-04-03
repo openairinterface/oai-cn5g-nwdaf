@@ -14,6 +14,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -159,34 +160,36 @@ func getFilterNwPerfNumPdu(engineReqData EngineReqData) bson.D {
 	// get startTs and endTs
 	startTs, endTs := getExtraReportReq(engineReqData)
 	timeStampCondition := getTimeStampCondition(startTs, endTs)
-	// get timestamps filter
-	filterTimePdu := bson.D{{"pdusesestlist",
-		bson.M{"$elemMatch": bson.M{
-			"timestamp": timeStampCondition,
-		}},
-	},
+	sessionFilter := bson.M{
+		"timestamp": timeStampCondition,
 	}
 	// get Dnn filter
-	filterDnn := bson.D{}
 	if engineReqData.Dnns != nil {
-		// filter UE that have dnn in dnns
-		filterDnn = bson.D{{"pdusesestlist",
-			bson.M{"$elemMatch": bson.M{
-				"dnn": bson.D{{"$in", engineReqData.Dnns}},
-			}},
-		}}
+		sessionFilter["dnn"] = bson.D{{"$in", engineReqData.Dnns}}
 	}
 	// get Snssai filter
-	filterSnssai := bson.D{}
 	if engineReqData.Snssaia != nil {
-		// filter UE that have Snssai in dSnssai
-		filterSnssai = bson.D{{"pdusesestlist",
-			bson.M{"$elemMatch": bson.M{
-				"snssai": bson.D{{"$in", engineReqData.Snssaia}},
-			}},
-		}}
+		snssaiFilters := make(bson.A, 0, len(engineReqData.Snssaia))
+		for _, snssai := range engineReqData.Snssaia {
+			snssaiFilter := bson.M{
+				"snssai.sst": snssai.Sst,
+			}
+			if snssai.Sd != "" {
+				normalizedSd := strings.ToLower(snssai.Sd)
+				snssaiFilter["snssai.sd"] = bson.D{{"$in", bson.A{
+					normalizedSd,
+					strings.ToUpper(normalizedSd),
+				}}}
+			}
+			snssaiFilters = append(snssaiFilters, snssaiFilter)
+		}
+		if len(snssaiFilters) == 1 {
+			for key, value := range snssaiFilters[0].(bson.M) {
+				sessionFilter[key] = value
+			}
+		} else if len(snssaiFilters) > 1 {
+			sessionFilter["$or"] = snssaiFilters
+		}
 	}
-	// combien the three filters
-	filter := bson.D{{"$and", bson.A{filterTimePdu, filterDnn, filterSnssai}}}
-	return filter
+	return bson.D{{"pdusesestlist", bson.M{"$elemMatch": sessionFilter}}}
 }

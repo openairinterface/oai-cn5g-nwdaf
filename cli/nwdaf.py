@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: LicenseRef-CSSL-1.0
 
 import json
+import os
 import requests
 import typer
 from flask import Flask, request
 
-analytics_url = 'http://oai-nwdaf-nbi-gateway/nnwdaf-analyticsinfo/v1/analytics'
-subscription_url = 'http://oai-nwdaf-nbi-gateway/nnwdaf-eventssubscription/v1/subscriptions'
+nbi_gateway_url = os.environ.get('NWDAF_NBI_GATEWAY_URL', 'http://oai-nwdaf-nbi-gateway')
+analytics_url = f'{nbi_gateway_url}/nnwdaf-analyticsinfo/v1/analytics'
+subscription_url = f'{nbi_gateway_url}/nnwdaf-eventssubscription/v1/subscriptions'
 app = typer.Typer()
 flask_app = Flask(__name__)
 

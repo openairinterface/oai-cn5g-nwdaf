@@ -15,7 +15,9 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"strings"
 	"time"
+	"unicode"
 
 	smf_client "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/smfclient"
 	"go.mongodb.org/mongo-driver/bson"
@@ -120,10 +122,11 @@ func getUpdatePDU_SES_EST(notif smf_client.EventNotification) (bson.D, error) {
 	if !ok {
 		return nil, errors.New("failed to get AdIpv4Addr")
 	}
-	dnn, ok := notif.GetDnnOk()
+	rawDnn, ok := notif.GetDnnOk()
 	if !ok {
 		return nil, errors.New("failed to get Dnn")
 	}
+	dnn := strings.TrimLeftFunc(*rawDnn, unicode.IsControl)
 	pduSeId, ok := notif.GetPduSeIdOk()
 	if !ok {
 		return nil, errors.New("failed to get PduSeId")
@@ -139,7 +142,7 @@ func getUpdatePDU_SES_EST(notif smf_client.EventNotification) (bson.D, error) {
 	timeStamp := time.Now().Unix()
 	push := pduSesEst{
 		AdIpv4Addr:  adIpv4Addr,
-		Dnn:         dnn,
+		Dnn:         &dnn,
 		PduSeId:     pduSeId,
 		PduSessType: pduSessType,
 		Snssai:      snssai,
