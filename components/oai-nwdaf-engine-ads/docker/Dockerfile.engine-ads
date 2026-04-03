@@ -4,9 +4,8 @@
 
 FROM python:3.6.9-slim AS oai-nwdaf-engine-ads
 WORKDIR /app
-RUN apt-get update && apt-cache search net-tools &&  apt-get install --yes net-tools
 COPY requirements.txt .
-RUN pip install --no-color --upgrade pip wheel && \
+RUN pip install --no-color --upgrade "pip<22" "setuptools<60" "wheel<0.38" && \
     pip install --no-cache-dir -r requirements.txt --no-color && \
     pip cache purge
 COPY . .
