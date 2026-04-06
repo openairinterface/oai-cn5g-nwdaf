@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-4.0 -->
+
 # NWDAF ML Model Provision Service API
 
 ----------------------------------------------------------
