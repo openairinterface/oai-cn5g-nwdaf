@@ -2,7 +2,7 @@
 
 # RELEASE NOTES:
 
-## v2.2.1 -- March 2026
+## v2.2.1 -- April 2026
 
 * Change of license from OAI Public License v1.1 to CSSL v1.0
 * Re-license documentation to the CC-BY-4.0 License
