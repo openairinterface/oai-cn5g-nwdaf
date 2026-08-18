@@ -151,8 +151,11 @@ To deploy the OAI 5G Core Network, execute the following commands:
 # Make sure you are in the oai-cn5g-fed/docker-compose project repository
 cd oai-cn5g-fed/docker-compose
 
+# The UE_COMMUNICATION analytics are derived from the SMF usage reports
+sed -i -e "s@enable_usage_reporting: no@enable_usage_reporting: yes@" conf/basic_nrf_config_ebpf.yaml
+
 # You can deploy 5G CN only with NRF (scenario 1) and HTTP.
-python3 ./core-network.py --type start-basic-vpp --scenario 1
+python3 ./core-network.py --type start-basic-ebpf --scenario 1
 ```
 
 **Warning -** If you stop the 5G CN, specifically AMF and SMF, while NWDAF is still running, 
@@ -184,17 +187,17 @@ Ensure you have the `gnbsim` image by pulling a prebuilt Docker image
 
 ```bash
 docker pull rohankharade/gnbsim
-docker image tag rohankharade/gnbsim:latest gnbsim:latest
+docker image tag rohankharade/gnbsim:latest gnbsim:develop
 ```
 
-Attach a UE using the gnbsim-vpp:
+Attach a UE using the gnbsim-ebpf:
 
 ```bash
 # Navigate to the oai-cn5g-fed project repository
 cd ../oai-cn5g-fed
 
-# Attach a UE using the gnbsim-vpp scenario
-docker-compose -f docker-compose/docker-compose-gnbsim-vpp.yaml up -d --force-recreate
+# Attach a UE using the gnbsim-ebpf scenario
+docker-compose -f docker-compose/docker-compose-gnbsim-ebpf.yaml up -d --force-recreate
 ```
 
 ### 4.2. Testing NWDAF features
@@ -284,14 +287,14 @@ cd ../../oai-cn5g-nwdaf
 docker-compose -f docker-compose/docker-compose-nwdaf-cn-http2.yaml down
 ```
 
-To stop the `gnbsim-vpp`, run:
+To stop the `gnbsim-ebpf`, run:
 
 ```bash
 # Make sure you are in the oai-cn5g-fed project repository
 cd ../oai-cn5g-fed
 
 # Stop UE
-docker-compose -f docker-compose/docker-compose-gnbsim-vpp.yaml down
+docker-compose -f docker-compose/docker-compose-gnbsim-ebpf.yaml down
 ```
 
 To stop the `OAI CN`, run:
@@ -301,7 +304,7 @@ To stop the `OAI CN`, run:
 cd docker-compose
 
 # Stop CN
-python3 ./core-network.py --type stop-basic-vpp --scenario 1
+python3 ./core-network.py --type stop-basic-ebpf --scenario 1
 ```
 
 

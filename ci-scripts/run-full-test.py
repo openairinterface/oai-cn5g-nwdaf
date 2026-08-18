@@ -20,10 +20,11 @@ logging.basicConfig(
 
 PrivateRegistryURL = 'selfix.sboai.cs.eurecom.fr'
 ms_names = ["nbi-analytics", "nbi-events", "nbi-ml", "engine", "engine-ads", "sbi"]
-cn_names = ["amf", "ausf", "nrf", "smf", "udm", "udr"]
+cn_names = ["amf", "ausf", "nrf", "smf", "udm", "udr", "upf"]
 cli_image_name = 'nwdaf-cli'
 
-cn5g_deploy_file = 'docker-compose-basic-vpp-nrf.yaml'
+cn5g_deploy_file = 'docker-compose-basic-nrf-ebpf.yaml'
+cn5g_conf_file = 'conf/basic_nrf_config_ebpf.yaml'
 nwdaf_deploy_file = 'docker-compose-nwdaf-cn-http2.yaml'
 original_nwdaf_deploy_contents = None
 
@@ -126,7 +127,8 @@ def deployOAICN5G():
     if not os.path.isdir('tests/.git'):
         myCmds.run('git clone --branch develop https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed.git tests')
     myCmds.run('cd tests && git submodule update --init ci-scripts')
-    ret = myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type start-basic-vpp --scenario 1')
+    myCmds.run(f'sed -i -e "s@enable_usage_reporting: no@enable_usage_reporting: yes@" tests/docker-compose/{cn5g_conf_file}')
+    ret = myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type start-basic-ebpf --scenario 1')
     cwd = os.getcwd()
     with open(f'{cwd}/archives/cn5g_deploy.log', 'w') as wfile:
         wfile.write(ret.stdout)
@@ -149,7 +151,7 @@ def undeployOAICN5G(do_capture):
     myCmds.run(f'cd tests/docker-compose && docker-compose -f {cn5g_deploy_file} stop')
     for nf in cn_names:
         myCmds.run(f'docker logs oai-{nf} > archives/{nf}.log 2>&1')
-    myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type stop-basic-vpp --scenario 1')
+    myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type stop-basic-ebpf --scenario 1')
     ret2 = myCmds.run(f'cd tests/docker-compose && docker-compose -f {cn5g_deploy_file} ps --all')
     for line in ret2.stdout.split('\n'):
         logging.debug(line)
@@ -276,11 +278,12 @@ def testNWDAF():
         if ret.stdout.strip() != test0Res:
             logging.error(f'Test {name} expected was {test0Res}')
             testStatus = -1
-    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-vpp.yaml up -d')
-    myCmds.run('./tests/ci-scripts/checkContainerStatus.py --container_name gnbsim-vpp --timeout 30')
+    myCmds.run('docker image inspect gnbsim:develop > /dev/null 2>&1 || docker image tag gnbsim:latest gnbsim:develop')
+    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-ebpf.yaml up -d')
+    myCmds.run('./tests/ci-scripts/checkContainerStatus.py --container_name gnbsim-ebpf --timeout 30')
     time.sleep(10)
     # Retrieve the UE allocated IP address
-    ret = myCmds.run('docker logs gnbsim-vpp 2>&1 | grep "UE address:"')
+    ret = myCmds.run('docker logs gnbsim-ebpf 2>&1 | grep "UE address:"')
     ipAddr = ''
     if ret.returncode == 0:
         ipRet = re.search('UE address: ([0-9.]+)', ret.stdout)
@@ -288,7 +291,7 @@ def testNWDAF():
             ipAddr = ipRet.group(1)
             logging.debug(f'UE was allocated this IP address ({ipAddr}) by the CN5G')
     if ipAddr != '':
-        myCmds.run(f'docker exec gnbsim-vpp /bin/bash -c "ping -c50 -i 0.2 -s 1016 -I {ipAddr} 192.168.73.135" > archives/ping_test.log 2>&1')
+        myCmds.run(f'docker exec gnbsim-ebpf /bin/bash -c "ping -c50 -i 0.2 -s 1016 -I {ipAddr} 192.168.72.135" > archives/ping_test.log 2>&1')
     time.sleep(20)
     # Second round of testing after connecting one UE and done some traffic
     for name, jqPattern, test0Res, test1Res in analyticsTests:
@@ -299,9 +302,9 @@ def testNWDAF():
             logging.error(f'Test {name} expected was {test1Res}')
             testStatus = -1
     time.sleep(10)
-    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-vpp.yaml stop')
-    myCmds.run('docker logs gnbsim-vpp > archives/gnbsim-vpp.log 2>&1')
-    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-vpp.yaml down')
+    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-ebpf.yaml stop')
+    myCmds.run('docker logs gnbsim-ebpf > archives/gnbsim-ebpf.log 2>&1')
+    myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-ebpf.yaml down')
     if testStatus != 0:
         logging.error('\u001B[1mTesting the Analytics Info API FAILED!\u001B[0m')
     return testStatus

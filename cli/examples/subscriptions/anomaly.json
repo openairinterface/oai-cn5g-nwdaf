@@ -1,5 +1,5 @@
 {
-  "notificationURI": "http://192.168.70.1:3000/notification",
+  "notificationURI": "http://192.168.70.129:3000/notification",
   "eventSubscriptions": [
     {
       "event": "ABNORMAL_BEHAVIOUR",
