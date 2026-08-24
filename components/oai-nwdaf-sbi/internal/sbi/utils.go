@@ -14,8 +14,8 @@ import (
 	"time"
 
 	"github.com/kelseyhightower/envconfig"
-	amf_client "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/amfclient"
-	smf_client "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/smfclient"
+	amf_client "github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/amfclient"
+	smf_client "github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/smfclient"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )

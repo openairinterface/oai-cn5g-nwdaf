@@ -1,4 +1,4 @@
-module gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-engine
+module github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-engine
 
 go 1.20
 

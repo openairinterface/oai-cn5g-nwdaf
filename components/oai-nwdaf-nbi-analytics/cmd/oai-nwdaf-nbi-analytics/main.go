@@ -15,7 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	"gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-analytics/internal/analytics"
+	"github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-analytics/internal/analytics"
 )
 
 type MainConfig struct {

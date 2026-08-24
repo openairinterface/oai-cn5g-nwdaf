@@ -15,7 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	sbi "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/sbi"
+	sbi "github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-sbi/internal/sbi"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 )

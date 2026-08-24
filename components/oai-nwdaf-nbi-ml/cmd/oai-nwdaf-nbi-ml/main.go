@@ -15,7 +15,7 @@ import (
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
-	nbi_ml "gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-ml/internal/nbiml"
+	nbi_ml "github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-ml/internal/nbiml"
 )
 
 type MainConfig struct {

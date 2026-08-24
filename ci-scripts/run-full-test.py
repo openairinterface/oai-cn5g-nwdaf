@@ -125,7 +125,7 @@ def deployOAICN5G():
     myCmds = cls_cmd.LocalCmd()
     myCmds.run('mkdir -p tests archives')
     if not os.path.isdir('tests/.git'):
-        myCmds.run('git clone --branch develop https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed.git tests')
+        myCmds.run('git clone --branch develop https://github.com/openairinterface/oai-cn5g-fed.git tests')
     myCmds.run('cd tests && git submodule update --init ci-scripts')
     myCmds.run(f'sed -i -e "s@enable_usage_reporting: no@enable_usage_reporting: yes@" tests/docker-compose/{cn5g_conf_file}')
     ret = myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type start-basic-ebpf --scenario 1')
