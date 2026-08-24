@@ -1,4 +1,4 @@
-module gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-analytics
+module github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-analytics
 
 go 1.20
 

@@ -31,7 +31,7 @@ guiding users through the process of deploying NWDAF using container-based techn
 ### Clone the repository
 
 ```bash
-git clone https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-nwdaf.git
+git clone https://github.com/openairinterface/oai-cn5g-nwdaf.git
 cd oai-cn5g-nwdaf
 # to use the latest release
 git checkout master
@@ -142,7 +142,7 @@ For this deployment, we used the OAI CN `develop` branch.
 cd ..
 
 # Clone the OAI CN repository
-git clone --branch develop https://gitlab.eurecom.fr/oai/cn5g/oai-cn5g-fed.git
+git clone --branch develop https://github.com/openairinterface/oai-cn5g-fed.git
 ```
 
 To deploy the OAI 5G Core Network, execute the following commands:
