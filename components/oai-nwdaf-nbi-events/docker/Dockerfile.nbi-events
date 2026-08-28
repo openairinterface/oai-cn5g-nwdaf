@@ -2,8 +2,8 @@
 # * SPDX-License-Identifier: LicenseRef-CSSL-1.0
 # */
 
-ARG BUILD_IMAGE=golang:1.19-alpine
-ARG TARGET_IMAGE=alpine:3.18
+ARG BUILD_IMAGE=golang:1.26.7-alpine3.23
+ARG TARGET_IMAGE=alpine:3.23.5
 
 #---------------------------------------------------------------------
 # BUILDER IMAGE
