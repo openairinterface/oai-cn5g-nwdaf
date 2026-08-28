@@ -1,4 +1,26 @@
+# Python
 *.pyc
-cli/env
-archives
+__pycache__/
+.pytest_cache/
+
+# Local environment
+cli/env/
+.venv/
+venv/
+env/
+
+# Generated files
+archives/
 *.html
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+.cproject
+.project
+.settings/
+
+# OS files
+.DS_Store
+Thumbs.db
