@@ -1,18 +1,6 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 
-<table style="border-collapse: collapse; border: none;">
-  <tr style="border-collapse: collapse; border: none;">
-    <td style="border-collapse: collapse; border: none;">
-      <a href="http://www.openairinterface.org/">
-         <img src="./images/oai_final_logo.png" alt="" border=3 height=50 width=150>
-         </img>
-      </a>
-    </td>
-    <td style="border-collapse: collapse; border: none; vertical-align: center;">
-      <b><font size = "5">OpenAirInterface implementation of the 5G Network Data Analytics Function</font></b>
-    </td>
-  </tr>
-</table>
+# OpenAirInterface implementation of the 5G Network Data Analytics Function
 
 NWDAF contains:
 
@@ -23,7 +11,7 @@ NWDAF contains:
 - NWDAF Engine ADS [**Engine ADS**]
 - NWDAF Southbound Interface [**SBI**]
 
-Its primary objective is to offer comprehensive documentation and tutorials 
+Its primary objective is to offer comprehensive documentation and tutorials
 guiding users through the process of deploying NWDAF using container-based technology.
 
 ## 1. Building NWDAF images
@@ -33,24 +21,23 @@ guiding users through the process of deploying NWDAF using container-based techn
 ```bash
 git clone https://github.com/openairinterface/oai-cn5g-nwdaf.git
 cd oai-cn5g-nwdaf
-# to use the latest release
-git checkout master
-# to use the latest development sprint result
 git checkout develop
 ```
 
-Note: use the `--no-cache` flag only when you need a clean rebuild. If nothing changed, reusing Docker cache is faster.
+Note: use the `--no-cache` flag only when you need a clean rebuild.
+If nothing changed, reusing Docker cache is faster.
 
-All images but `oai-nwdaf-engine-ads` have a target base with `alpine`. They can be run on any operating system.
+All images but `oai-nwdaf-engine-ads` have a target base with `alpine`.
+They can be run on any operating system.
 
-As for `oai-nwdaf-engine-ads`, it has a `python:3.6.9-slim` target base (which is `Debian:10`-based). 
+As for `oai-nwdaf-engine-ads`, it has a `python:3.6.9-slim` target base (which is `Debian:10`-based).
 It should be able to run on any operating system as well.
 
 ### 1.1. oai-nwdaf-nbi-analytics
 
 ```bash
 docker build \
-            --target oai-nwdaf-nbi-analytics  --tag oai-nwdaf-nbi-analytics:latest \
+            --target oai-nwdaf-nbi-analytics --tag oai-nwdaf-nbi-analytics:latest \
             --file components/oai-nwdaf-nbi-analytics/docker/Dockerfile.nbi-analytics \
             components/oai-nwdaf-nbi-analytics
 ```
@@ -59,7 +46,7 @@ docker build \
 
 ```bash
 docker build \
-            --target oai-nwdaf-nbi-events  --tag oai-nwdaf-nbi-events:latest \
+            --target oai-nwdaf-nbi-events --tag oai-nwdaf-nbi-events:latest \
             --file components/oai-nwdaf-nbi-events/docker/Dockerfile.nbi-events \
             components/oai-nwdaf-nbi-events
 ```
@@ -68,7 +55,7 @@ docker build \
 
 ```bash
 docker build  \
-            --target oai-nwdaf-nbi-ml  --tag oai-nwdaf-nbi-ml:latest \
+            --target oai-nwdaf-nbi-ml --tag oai-nwdaf-nbi-ml:latest \
             --file components/oai-nwdaf-nbi-ml/docker/Dockerfile.nbi-ml \
             components/oai-nwdaf-nbi-ml
 ```
@@ -77,7 +64,7 @@ docker build  \
 
 ```bash
 docker build  \
-            --target oai-nwdaf-engine  --tag oai-nwdaf-engine:latest \
+            --target oai-nwdaf-engine --tag oai-nwdaf-engine:latest \
             --file components/oai-nwdaf-engine/docker/Dockerfile.engine \
             components/oai-nwdaf-engine
 ```
@@ -86,7 +73,7 @@ docker build  \
 
 ```bash
 docker build \
-            --target oai-nwdaf-engine-ads  --tag oai-nwdaf-engine-ads:latest \
+            --target oai-nwdaf-engine-ads --tag oai-nwdaf-engine-ads:latest \
             --file components/oai-nwdaf-engine-ads/docker/Dockerfile.engine-ads \
             components/oai-nwdaf-engine-ads
 ```
@@ -95,7 +82,7 @@ docker build \
 
 ```bash
 docker build \
-            --target oai-nwdaf-sbi  --tag oai-nwdaf-sbi:latest \
+            --target oai-nwdaf-sbi --tag oai-nwdaf-sbi:latest \
             --file components/oai-nwdaf-sbi/docker/Dockerfile.sbi \
             components/oai-nwdaf-sbi
 ```
@@ -131,15 +118,15 @@ echo "127.1.0.1   oai-nwdaf-nbi-gateway" | sudo tee -a /etc/hosts
 
 ## 3. NWDAF deployment
 
-![](./images/nwdaf_deployment.jpg)
+![NWDAF Deployment](./images/nwdaf_deployment.jpg)
 
 ### 3.1. Starting 5G CN
 
-For this deployment, we used the OAI CN `develop` branch. 
+For this deployment, we used the OAI CN `develop` branch.
 
 ```bash
-# Navigate out of the oai-nwdaf project repository
-cd ..
+# Open a new terminal
+cd ~
 
 # Clone the OAI CN repository
 git clone --branch develop https://github.com/openairinterface/oai-cn5g-fed.git
@@ -158,8 +145,8 @@ sed -i -e "s@enable_usage_reporting: no@enable_usage_reporting: yes@" conf/basic
 python3 ./core-network.py --type start-basic-ebpf --scenario 1
 ```
 
-**Warning -** If you stop the 5G CN, specifically AMF and SMF, while NWDAF is still running, 
-the subscriptions to the network functions will be lost. 
+**Warning -** If you stop the 5G CN, specifically AMF and SMF, while NWDAF is still running,
+the subscriptions to the network functions will be lost.
 Ensure to restart NWDAF every time you restart 5G CN to maintain correct behavior.
 
 ### 3.2. Starting NWDAF
@@ -178,7 +165,7 @@ docker-compose -f docker-compose/docker-compose-nwdaf-cn-http2.yaml up -d --forc
 
 ## 4. Testing
 
-After ensuring both the 5G CN and NWDAF are up and running, 
+After ensuring both the 5G CN and NWDAF are up and running,
 you can conduct various tests to validate NWDAF features. Here's how you can perform the tests:
 
 ### 4.1. Attaching gnbsim
@@ -283,7 +270,7 @@ cd ../../oai-cn5g-nwdaf
 ```
 
 ```bash
-# Stop NWDAF if AMF/SMF 
+# Stop NWDAF if AMF/SMF
 docker-compose -f docker-compose/docker-compose-nwdaf-cn-http2.yaml down
 ```
 
@@ -308,7 +295,7 @@ python3 ./core-network.py --type stop-basic-ebpf --scenario 1
 ```
 
 
-# 6. Support/further resources
+## 6. Support/further resources
 
 - [Original OAI-NWDAF paper IEEE GLOBECOM 2023](https://www.eurecom.fr/publication/7410/download/comsys-publi-7410.pdf)
 - [Demo](https://lnkd.in/e-b2jaHk)
