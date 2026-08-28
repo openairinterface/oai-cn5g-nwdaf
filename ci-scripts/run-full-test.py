@@ -123,14 +123,14 @@ def ensureLocalCliImage(tag):
 def deployOAICN5G():
     logging.debug('\u001B[1mDeploying the OAI CN5G develop\u001B[0m')
     myCmds = cls_cmd.LocalCmd()
-    myCmds.run('mkdir -p tests archives')
+    myCmds.run('mkdir -p tests archives/build archives/containers archives/cn5g archives/tests archives/capture archives/checks')
     if not os.path.isdir('tests/.git'):
         myCmds.run('git clone --branch develop https://github.com/openairinterface/oai-cn5g-fed.git tests')
     myCmds.run('cd tests && git submodule update --init ci-scripts')
     myCmds.run(f'sed -i -e "s@enable_usage_reporting: no@enable_usage_reporting: yes@" tests/docker-compose/{cn5g_conf_file}')
     ret = myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type start-basic-ebpf --scenario 1')
     cwd = os.getcwd()
-    with open(f'{cwd}/archives/cn5g_deploy.log', 'w') as wfile:
+    with open(f'{cwd}/archives/cn5g/deploy.log', 'w') as wfile:
         wfile.write(ret.stdout)
     ret2 = myCmds.run(f'cd tests/docker-compose && docker-compose -f {cn5g_deploy_file} ps --all')
     for line in ret2.stdout.split('\n'):
@@ -150,7 +150,7 @@ def undeployOAICN5G(do_capture):
         return 0
     myCmds.run(f'cd tests/docker-compose && docker-compose -f {cn5g_deploy_file} stop')
     for nf in cn_names:
-        myCmds.run(f'docker logs oai-{nf} > archives/{nf}.log 2>&1')
+        myCmds.run(f'docker logs oai-{nf} > archives/cn5g/{nf}.log 2>&1')
     myCmds.run('cd tests/docker-compose && python3 ./core-network.py --type stop-basic-ebpf --scenario 1')
     ret2 = myCmds.run(f'cd tests/docker-compose && docker-compose -f {cn5g_deploy_file} ps --all')
     for line in ret2.stdout.split('\n'):
@@ -158,7 +158,7 @@ def undeployOAICN5G(do_capture):
     if do_capture:
         for capture_file in ('/tmp/oai-nwdaf.pcap', '/tmp/oai-nwdaf.log'):
             if os.path.exists(capture_file):
-                myCmds.run(f'cp {capture_file} archives')
+                myCmds.run(f'cp {capture_file} archives/capture')
                 myCmds.run(f'rm -f {capture_file}')
     myCmds.run('docker volume prune -f')
     myCmds.run('docker network prune -f')
@@ -236,7 +236,7 @@ def undeployNWDAF():
     myCmds.run('docker rm -f test-cli')
     ret = myCmds.run(f'docker-compose -f docker-compose/{nwdaf_deploy_file} stop')
     for service in ms_names:
-        myCmds.run(f'docker logs oai-nwdaf-{service} > archives/nwdaf-{service}.log 2>&1')
+        myCmds.run(f'docker logs oai-nwdaf-{service} > archives/containers/{service}.log 2>&1')
     ret = myCmds.run(f'docker-compose -f docker-compose/{nwdaf_deploy_file} down')
     if original_nwdaf_deploy_contents is not None:
         with open(f'docker-compose/{nwdaf_deploy_file}', 'w') as deploy_file:
@@ -291,7 +291,7 @@ def testNWDAF():
             ipAddr = ipRet.group(1)
             logging.debug(f'UE was allocated this IP address ({ipAddr}) by the CN5G')
     if ipAddr != '':
-        myCmds.run(f'docker exec gnbsim-ebpf /bin/bash -c "ping -c50 -i 0.2 -s 1016 -I {ipAddr} 192.168.72.135" > archives/ping_test.log 2>&1')
+        myCmds.run(f'docker exec gnbsim-ebpf /bin/bash -c "ping -c50 -i 0.2 -s 1016 -I {ipAddr} 192.168.72.135" > archives/tests/ping.log 2>&1')
     time.sleep(20)
     # Second round of testing after connecting one UE and done some traffic
     for name, jqPattern, test0Res, test1Res in analyticsTests:
@@ -303,7 +303,7 @@ def testNWDAF():
             testStatus = -1
     time.sleep(10)
     myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-ebpf.yaml stop')
-    myCmds.run('docker logs gnbsim-ebpf > archives/gnbsim-ebpf.log 2>&1')
+    myCmds.run('docker logs gnbsim-ebpf > archives/cn5g/gnbsim.log 2>&1')
     myCmds.run('cd tests/docker-compose && docker-compose -f docker-compose-gnbsim-ebpf.yaml down')
     if testStatus != 0:
         logging.error('\u001B[1mTesting the Analytics Info API FAILED!\u001B[0m')

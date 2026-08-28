@@ -1,0 +1,484 @@
+#!/bin/groovy
+/*
+ * SPDX-License-Identifier: MIT
+ */
+
+import groovy.transform.Field
+
+// ----------------------------------------------------------------------------
+// NWDAF is a Go/Python NF: there is no C/C++ in this repository, so there are
+// no clang-format or cppcheck stages. The pipeline builds the six
+// micro-service images and runs the end-to-end deployment test.
+// ----------------------------------------------------------------------------
+
+@Field def ubuntuBuildResource                            // Ubuntu build lock
+@Field def ubuntuTestResource                             // Ubuntu test lock
+@Field def PrivateRegistryURL                             // internal registry URL
+@Field def DH_Account                                     // Docker Hub account
+@Field def dockerHubCredentialsId                         // Docker Hub login creds
+@Field def privateRegistryCredentialsId                   // private registry login creds
+@Field def githubCredentialsId = 'github-jenkins-oai-cn'  // GitHub checkout creds
+
+@Field def isPullRequest = false            // true if triggered by a PR
+@Field def nwdaf_tag     = 'develop'        // image tag, set later
+@Field def nwdaf_branch  = ''               // source branch
+@Field def targetBranch  = ''               // PR target branch
+@Field def shortenShaOne = ''               // short commit SHA
+@Field def failingStages = ''               // markdown bullet list of failed stages, for the PR comment
+@Field def dockerBuildOptions = ''          // --no-cache on push builds
+@Field def mrValidationWarning = ''         // Signed-off-by / CLA guideline message, for the PR comment
+@Field def preBuildFailureMessage = ''      // pre-build stage failure note, for the PR comment
+@Field def claHost                          // host holding the CLA signatory list
+@Field def claFile                          // CLA signatory list, path on claHost
+
+// NWDAF micro-services
+@Field def ms_names = ["nbi-analytics", "nbi-events", "nbi-ml", "engine", "engine-ads", "sbi"]
+
+//-------------------------------------------------------------------------------
+pipeline {
+  agent {
+    label params.UbuntuBuildNode
+  }
+  options {
+    disableConcurrentBuilds()
+    timestamps()
+    ansiColor('xterm')
+  }
+
+  stages {
+    // Load + validate job parameters
+    stage ('Initialize Pipeline Configuration') {
+      steps {
+        script {
+          ubuntuBuildResource          = params.UbuntuBuildResource
+          ubuntuTestResource           = params.UbuntuTestResource
+          PrivateRegistryURL           = params.PrivateRegistryURL
+          DH_Account                   = params.DH_Account
+          dockerHubCredentialsId       = params.DockerHubCredentials
+          privateRegistryCredentialsId = params.PrivateRegistryCredentials
+          claHost                      = params.claHost
+          claFile                      = params.claFile
+          JOB_TIMESTAMP = sh(returnStdout: true, script: 'date --utc --rfc-3339=seconds | sed -e "s#+00:00##"').trim()
+          if (!dockerHubCredentialsId) {
+            error "No credentials to push to Docker Hub -- stopping pipeline"
+          }
+          if (params.PrivateRegistryCredentials == null) {
+            error "No credentials to log in to the private docker registry!"
+          }
+          // Detect PR early so pre-build stage failures still post a PR comment.
+          isPullRequest = !!env.GITHUB_PR_NUMBER?.trim()
+        }
+      }
+      post {
+        failure {
+          script {
+            preBuildFailureMessage = "Pipeline configuration error: check the job parameters and credentials."
+            echo preBuildFailureMessage
+            recordFailure()
+          }
+        }
+      }
+    }
+
+    stage ('Prepare Source Metadata') {
+      steps {
+        script {
+          def gitLocalBranch = env.GIT_BRANCH ? env.GIT_BRANCH.replace('origin/', '') : ''
+          isPullRequest = !!env.GITHUB_PR_NUMBER?.trim()
+          echo "Preparing build metadata for NWDAF"
+
+          if (isPullRequest) {
+            def prHeadSha = env.GITHUB_PR_HEAD_SHA
+            if (!prHeadSha) {
+              error "GITHUB_PR_HEAD_SHA is missing -- cannot identify the commit to build for PR #${env.GITHUB_PR_NUMBER}"
+            }
+
+            nwdaf_branch  = env.GITHUB_PR_SOURCE_BRANCH
+            targetBranch  = env.GITHUB_PR_TARGET_BRANCH
+            shortenShaOne = prHeadSha.take(8)
+            nwdaf_tag     = "${nwdaf_branch.replace('/', '-').replace('+', '-')}-${prHeadSha}"
+            dockerBuildOptions = ''
+
+            echo "PR number           :   ${env.GITHUB_PR_NUMBER}"
+            echo "Source Repository   :   ${env.GITHUB_PR_URL}"
+            echo "Source Branch       :   ${nwdaf_branch}"
+            echo "Commit ID           :   ${prHeadSha}"
+            echo "Target Repo         :   ${env.GIT_URL}"
+            echo "Target Branch       :   ${targetBranch}"
+            echo "Label               :   ${env.GITHUB_PR_LABELS}"
+            echo "Tag                 :   ${nwdaf_tag}"
+          } else {
+            if (!env.GIT_COMMIT) {
+              error "GIT_COMMIT is missing -- cannot identify the commit to build for branch '${gitLocalBranch}'"
+            }
+
+            nwdaf_branch  = gitLocalBranch
+            shortenShaOne = env.GIT_COMMIT.take(8)
+            nwdaf_tag     = "${gitLocalBranch}-${shortenShaOne}"
+            dockerBuildOptions = '--no-cache '
+
+            echo "Branch              :   ${gitLocalBranch}"
+            echo "Commit ID           :   ${env.GIT_COMMIT}"
+            echo "Tag                 :   ${nwdaf_tag}"
+          }
+          prepareWorkspace()
+        }
+      }
+      post {
+        success {
+          script {
+            notifyStageStatus('SUCCESS', 'Passed')
+          }
+        }
+        failure {
+          script {
+            preBuildFailureMessage = "Git operation failure or internal CI error"
+            if (isPullRequest)
+               preBuildFailureMessage += ", likely conflicts with ${targetBranch}; please resolve it."
+            echo preBuildFailureMessage
+            recordFailure()
+          }
+        }
+      }
+    }
+
+    // Signed-off-by / merge-commit / CLA checks on the PR's commits.
+    stage('Verify Guidelines') {
+      when {
+        expression { return isPullRequest }
+      }
+      steps {
+        script {
+          withCredentials([
+            [$class: 'UsernamePasswordMultiBinding', credentialsId: githubCredentialsId, usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN']
+          ]) {
+            sh "git -c credential.helper='!f() { echo \"username=\$GITHUB_USERNAME\"; echo \"password=\$GITHUB_TOKEN\"; }; f' fetch --no-tags ${env.GIT_URL} +refs/heads/${targetBranch}:refs/remotes/origin/${targetBranch}"
+          }
+          // The list is kept on claHost: read it over SSH for the
+          // check instead of storing a copy on the build node. Retry
+          // to handle transient network failures.
+          retry(3) {
+            sh "ssh -o BatchMode=yes ${claHost} 'cat ${claFile}' > cla.csv"
+          }
+          // An empty list is a misconfiguration, not a reason to fail the CLA Check
+          sh "test -s cla.csv"
+
+          def mrValidationLog = "archives/checks/signed-commit-${env.BUILD_NUMBER}.log"
+          def mrValidationExitCode = sh(
+            script: "bash ./ci-scripts/common/bash/pre-ci-check.sh -s ${env.GITHUB_PR_HEAD_SHA} -t origin/${targetBranch} -r ${params.gitAccount}/${params.gitRepo} -p ${env.GITHUB_PR_NUMBER} -c cla.csv > ${mrValidationLog} 2>&1",
+            returnStatus: true
+          )
+          def mrValidationMessage = readFile(mrValidationLog).trim()
+          if (mrValidationExitCode >= 1) {
+            mrValidationWarning = mrValidationMessage
+          }
+          if (mrValidationExitCode >= 2) {
+            error("${mrValidationMessage}")
+          }
+        }
+      }
+      post {
+        success {
+          script {
+            notifyStageStatus('SUCCESS', 'Passed')
+          }
+        }
+        cleanup {
+          script {
+            sh "rm -f cla.csv"
+          }
+        }
+        failure {
+          script {
+            if (mrValidationWarning) {
+              echo "Guideline verification failed for NWDAF: ${mrValidationWarning}"
+            } else {
+              preBuildFailureMessage = "Git operation failure or internal CI error"
+              echo preBuildFailureMessage
+            }
+            recordFailure()
+          }
+        }
+      }
+    }
+
+    // Build the micro-service images and stage them in the private registry
+    stage ('Build NWDAF Microservice Images') {
+      steps {
+        lock(ubuntuBuildResource) {
+          script {
+            sh "docker image prune --force"
+            for (ms in ms_names) {
+              sh "docker buildx build ${dockerBuildOptions} --target oai-nwdaf-${ms} --tag oai-nwdaf-${ms}:${nwdaf_tag} --file components/oai-nwdaf-${ms}/docker/Dockerfile.${ms} components/oai-nwdaf-${ms} > archives/build/${ms}.log 2>&1"
+            }
+            sh "docker image ls | egrep --color=never 'nwdaf|REPOSITORY' > archives/build/image-list.log"
+            withCredentials([
+              [$class: 'UsernamePasswordMultiBinding', credentialsId: privateRegistryCredentialsId, usernameVariable: 'REGISTRY_USERNAME', passwordVariable: 'REGISTRY_PASSWORD']
+            ]) {
+              sh "echo \$REGISTRY_PASSWORD | docker login --username \$REGISTRY_USERNAME --password-stdin ${PrivateRegistryURL}"
+            }
+            for (ms in ms_names) {
+              sh "docker image tag oai-nwdaf-${ms}:${nwdaf_tag} ${PrivateRegistryURL}/oai-nwdaf-${ms}:${nwdaf_tag}"
+              sh "docker push ${PrivateRegistryURL}/oai-nwdaf-${ms}:${nwdaf_tag}"
+            }
+          }
+        }
+      }
+      post {
+        cleanup {
+          script {
+            for (ms in ms_names) {
+              sh "docker image rmi oai-nwdaf-${ms}:${nwdaf_tag} ${PrivateRegistryURL}/oai-nwdaf-${ms}:${nwdaf_tag} || true"
+            }
+          }
+        }
+        success {
+          sh "echo 'OAI-NWDAF DOCKER IMAGES BUILD: OK' >> archives/build/image-list.log"
+          script { notifyStageStatus('SUCCESS', 'Passed') }
+        }
+        failure {
+          sh "docker image ls | egrep --color=never 'nwdaf|REPOSITORY' > archives/build/image-list.log"
+          sh "echo 'OAI-NWDAF DOCKER IMAGES BUILD: KO' >> archives/build/image-list.log"
+          script {
+            recordFailure(nwdafReportLink())
+          }
+        }
+      }
+    }
+
+    // Deploy the 5g Core Network and NWDAF, drive the CLI, tear down.
+    stage ('Test NWDAF Microservices') {
+      steps {
+        lock(ubuntuTestResource) {
+          script {
+            sh "./ci-scripts/run-full-test.py --tag ${nwdaf_tag} --pull --capture"
+          }
+        }
+      }
+      post {
+        success {
+          script {
+            notifyStageStatus('SUCCESS', 'Passed')
+          }
+        }
+        failure {
+          script {
+            recordFailure(nwdafReportLink())
+          }
+        }
+      }
+    }
+
+    // Publish only on develop-branch pushes; PR/other pushes stay in the private registry.
+    stage ('Publish Image to Docker Hub') {
+      when { expression { !isPullRequest && nwdaf_branch == 'develop' } }
+      steps {
+        lock(ubuntuBuildResource) {
+          script {
+            withCredentials([
+              [$class: 'UsernamePasswordMultiBinding', credentialsId: dockerHubCredentialsId, usernameVariable: 'DH_Username', passwordVariable: 'DH_Password'],
+              [$class: 'UsernamePasswordMultiBinding', credentialsId: privateRegistryCredentialsId, usernameVariable: 'REGISTRY_USERNAME', passwordVariable: 'REGISTRY_PASSWORD']
+            ]) {
+              sh 'echo $DH_Password | docker login --username $DH_Username --password-stdin'
+              sh "echo \$REGISTRY_PASSWORD | docker login --username \$REGISTRY_USERNAME --password-stdin ${PrivateRegistryURL}"
+            }
+            for (ms in ms_names) {
+              sh "docker buildx imagetools create --tag ${DH_Account}/oai-nwdaf-${ms}:develop ${PrivateRegistryURL}/oai-nwdaf-${ms}:${nwdaf_tag}"
+            }
+          }
+        }
+      }
+      post {
+        success {
+          script {
+            echo "Published the images to dockerhub"
+            notifyStageStatus('SUCCESS', 'Passed')
+          }
+        }
+        unsuccessful {
+          script {
+            echo "Failed to publish NWDAF images to Docker Hub"
+            recordFailure()
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    success {
+      script {
+        if (isPullRequest) {
+          def message = "**CI Build:** [#${env.BUILD_NUMBER}](${BUILD_URL}) | **Passed**"
+          if (mrValidationWarning) {
+            message += "\n\n**Validation:** ${mrValidationWarning}"
+          }
+          githubPRComment comment: githubPRMessage(message)
+        }
+        notifyGitHub('SUCCESS', 'Build success', env.JOB_BASE_NAME)
+        echo "Pipeline is SUCCESSFUL"
+      }
+    }
+    failure {
+      script {
+        if (isPullRequest || env.GITHUB_PR_NUMBER) {
+          def message = "**CI Build:** [#${env.BUILD_NUMBER}](${BUILD_URL}) | **Failed**"
+          if (failingStages) {
+            message += " on the following stages:${failingStages}"
+          } else {
+            message += "\nThe pipeline may have failed due to CI, validation, or scripting error. See the build for more details."
+          }
+          if (preBuildFailureMessage) {
+            message += "\n\n${preBuildFailureMessage}"
+          }
+          if (mrValidationWarning) {
+            message += "\n\n**Validation:** ${mrValidationWarning}"
+          }
+          try { githubPRComment comment: githubPRMessage(message) }
+          catch (e) { echo "Could not post PR comment: ${e.message}" }
+        }
+        notifyGitHub('FAILURE', 'Build failed', env.JOB_BASE_NAME)
+        echo "Pipeline FAILED"
+      }
+    }
+    cleanup {
+      script {
+        generateAndArchiveReports()
+        sh "docker logout ${PrivateRegistryURL}"
+        sh "docker logout"
+      }
+    }
+  }
+}
+
+// ----------------------------------------------------------------------------
+// Helpers
+// ----------------------------------------------------------------------------
+
+// Check out GitHub's precomputed PR-merge ref (refs/pull/<N>/merge) so we build
+// exactly what GitHub considers mergeable; a missing ref means a conflict
+def checkoutSource() {
+  if (isPullRequest) {
+    echo "PR triggered - checking out merge ref for PR #${env.GITHUB_PR_NUMBER}"
+    try {
+      checkout([
+        $class: 'GitSCM',
+        branches: [[name: "refs/remotes/origin/pr/${env.GITHUB_PR_NUMBER}/merge"]],
+        userRemoteConfigs: [[
+          url: env.GIT_URL,
+          refspec: "+refs/pull/${env.GITHUB_PR_NUMBER}/merge:refs/remotes/origin/pr/${env.GITHUB_PR_NUMBER}/merge",
+          credentialsId: githubCredentialsId
+        ]]
+      ])
+    } catch (e) {
+      error("Checkout failed for PR #${env.GITHUB_PR_NUMBER} -- merge ref not found. " +
+            "The PR likely has a conflict with ${targetBranch} that must be resolved before CI can run. (${e.message})")
+    }
+  } else {
+    echo "Push triggered - checking out ${env.GIT_COMMIT} on branch ${nwdaf_branch}"
+    try {
+      checkout([
+        $class: 'GitSCM',
+        branches: [[name: env.GIT_COMMIT]],
+        userRemoteConfigs: [[
+          url: env.GIT_URL,
+          credentialsId: githubCredentialsId
+        ]]
+      ])
+    } catch (e) {
+      error("Checkout failed for commit ${env.GIT_COMMIT} on branch ${nwdaf_branch} from ${env.GIT_URL}. (${e.message})")
+    }
+  }
+}
+
+// Wipe the workspace, check out, and initialise submodules
+// over authenticated HTTPS
+def prepareWorkspace() {
+  deleteDir() // Wipe the workspace before checking out
+  checkoutSource()
+  sh 'git config user.email "oaicicdteam@openairinterface.org"'
+  sh 'git config user.name "OAI Jenkins"'
+  // -c scopes the credential helper to just this command, unlike a persisted `git config` write.
+  withCredentials([
+    [$class: 'UsernamePasswordMultiBinding', credentialsId: githubCredentialsId, usernameVariable: 'GITHUB_USERNAME', passwordVariable: 'GITHUB_TOKEN']
+  ]) {
+    sh '''
+      git -c credential.helper='!f() { echo "username=$GITHUB_USERNAME"; echo "password=$GITHUB_TOKEN"; }; f' submodule update --init --recursive
+    '''
+  }
+  sh "mkdir -p archives/build archives/containers archives/cn5g archives/tests archives/capture archives/checks"
+}
+
+// Post a GitHub commit status; PR builds target the PR head
+// Push builds the triggering commit.
+def notifyGitHub(String status, String description, String context) {
+  def sha = isPullRequest ? env.GITHUB_PR_HEAD_SHA : env.GIT_COMMIT
+  if (!sha) {
+    echo "Skipping GitHub notification for '${context}': no commit SHA"
+    return
+  }
+  githubNotify account: params.gitAccount,
+               repo: params.gitRepo,
+               credentialsId: githubCredentialsId,
+               sha: sha,
+               status: status,
+               description: description,
+               targetUrl: BUILD_URL,
+               context: context
+}
+
+def notifyStageStatus(String status, String description) {
+  notifyGitHub(status, description, env.STAGE_NAME)
+}
+
+// Mark the stage failed on GitHub and remember it for the summary PR comment.
+def recordFailure(String reportLink = null) {
+  failingStages += reportLink ? "\n * [${env.STAGE_NAME}](${reportLink})" : "\n * ${env.STAGE_NAME}"
+  notifyStageStatus('FAILURE', 'Failed')
+}
+
+// Link to this build's archived HTML report.
+def nwdafReportLink() {
+  return "${env.BUILD_URL}artifact/test_results_oai_nwdaf.html"
+}
+
+def generateAndArchiveReports() {
+  // An early failure (bad parameters, checkout error) can leave the workspace
+  // wiped or never populated -- nothing to report on.
+  if (!fileExists('ci-scripts/generateHtmlReport.py')) {
+    echo 'Skipping HTML report -- workspace was never checked out'
+    return
+  }
+
+  sh "zip -r -qq docker_logs.zip archives"
+  if (fileExists('docker_logs.zip')) {
+    archiveArtifacts artifacts: 'docker_logs.zip'
+  }
+
+  // The generator substitutes the PR link, title and build time itself, so no
+  // post-hoc sed over the generated HTML is needed.
+  if (isPullRequest) {
+    withEnv(["PR_TITLE=${env.GITHUB_PR_TITLE}"]) {
+      sh """./ci-scripts/generateHtmlReport.py --nf nwdaf \
+              --job-name ${JOB_NAME} --build-id ${BUILD_ID} --build-url ${BUILD_URL} \
+              --build-time "${JOB_TIMESTAMP}" \
+              --git-url ${env.GIT_URL} \
+              --git-src-branch ${nwdaf_branch} --git-src-commit ${env.GITHUB_PR_HEAD_SHA} \
+              --git-pull-request \
+              --git-dst-branch ${targetBranch} --git-dst-commit ${env.GIT_COMMIT} \
+              --pr-url ${env.GITHUB_PR_URL} --pr-title "\$PR_TITLE" """
+    }
+  } else {
+    sh """./ci-scripts/generateHtmlReport.py --nf nwdaf \
+            --job-name ${JOB_NAME} --build-id ${BUILD_ID} --build-url ${BUILD_URL} \
+            --build-time "${JOB_TIMESTAMP}" \
+            --git-url ${env.GIT_URL} \
+            --git-src-branch ${nwdaf_branch} --git-src-commit ${env.GIT_COMMIT}"""
+  }
+
+  def listOfFiles = sh(returnStdout: true, script: 'ls test_results*.html || true').trim()
+  if (!listOfFiles) { return }
+  for (htmlFile in listOfFiles.split("\\n")) {
+    archiveArtifacts artifacts: htmlFile
+  }
+}
