@@ -19,6 +19,11 @@ import (
 // to remove subscription, kill the go routine using channel adress from the table.
 var subscriptionTable = make(map[string]chan string)
 
+// What each subscription asked for, so it can be read back. TS 29.520
+// defines no GET on a subscription, but without one a consumer cannot
+// tell a live subscription from one lost to an NWDAF restart.
+var subscriptionData = make(map[string]NnwdafEventsSubscription)
+
 // IndividualNWDAFEventSubscriptionTransferDocumentApiRouter defines the required methods for binding the api requests to a responses for the IndividualNWDAFEventSubscriptionTransferDocumentApi
 // The IndividualNWDAFEventSubscriptionTransferDocumentApiRouter implementation should parse necessary information from the http request,
 // pass the data to a IndividualNWDAFEventSubscriptionTransferDocumentApiServicer to perform the required actions, then write the service results to the http response.
@@ -64,6 +69,7 @@ type IndividualNWDAFEventSubscriptionTransferDocumentApiServicer interface {
 // and updated with the logic required for the API.
 type IndividualNWDAFEventsSubscriptionDocumentApiServicer interface {
 	DeleteNWDAFEventsSubscription(context.Context, string) (ImplResponse, error)
+	GetNWDAFEventsSubscription(context.Context, string) (ImplResponse, error)
 	UpdateNWDAFEventsSubscription(context.Context, string, NnwdafEventsSubscription) (ImplResponse, error)
 }
 

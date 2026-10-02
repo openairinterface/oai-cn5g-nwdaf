@@ -89,6 +89,7 @@ func (s *NWDAFEventsSubscriptionsCollectionApiService) CreateNWDAFEventsSubscrip
 	subscriptionCh := make(chan string)
 	// add subscription channel to mapping table
 	subscriptionTable[subscriptionId] = subscriptionCh
+	subscriptionData[subscriptionId] = nnwdafEventsSubscription
 	// start go routine to handle subscription
 	for _, eventSub := range nnwdafEventsSubscription.EventSubscriptions {
 		go handleSubscriptionEvent(ctx,
@@ -121,6 +122,10 @@ func handleSubscriptionEvent(
 ) {
 	log.Print("Handling subscription to ", eventSub.Event,
 		" with subscription id ", subscriptionId)
+	// THRESHOLD state: the set of UEs currently judged degraded. A notification
+	// goes out whenever that set changes, so a second UE degrading is reported
+	// even though the overall "something is degraded" answer did not change.
+	degraded := map[string]bool{}
 loop:
 	for {
 		// check if channel is closed, break loop if true.
@@ -147,8 +152,58 @@ loop:
 				// sleep periodically
 				time.Sleep(time.Duration(eventSub.RepetitionPeriod) * time.Second)
 
+			case NOTIFICATIONMETHOD_THRESHOLD:
+				// Notify on the TRANSITION only, so the consumer is told when
+				// QoS starts degrading (and once when it recovers) rather than
+				// on every poll while it stays bad.
+				current, reason, err := qosSustainDegraded(eventSub, degraded)
+				if err != nil {
+					log.Print("threshold evaluation: ", err)
+					time.Sleep(thresholdPollInterval(eventSub))
+					continue
+				}
+				// Which edge was crossed: a UE newly below threshold is a
+				// DESCENDING crossing, one that climbed back is ASCENDING.
+				fell, rose := false, false
+				for supi := range current {
+					if !degraded[supi] {
+						fell = true
+					}
+				}
+				for supi := range degraded {
+					if !current[supi] {
+						rose = true
+					}
+				}
+				// TS 29.520: matchingDir says which crossings the consumer wants.
+				// Absent means CROSSED, which is what this did before.
+				want := eventSub.MatchingDir
+				notify := (fell && (want == "" || want == MATCHINGDIRECTION_CROSSED ||
+					want == MATCHINGDIRECTION_DESCENDING)) ||
+					(rose && (want == "" || want == MATCHINGDIRECTION_CROSSED ||
+						want == MATCHINGDIRECTION_ASCENDING))
+				if fell || rose {
+					degraded = current
+				}
+				if notify {
+					if fell {
+						log.Print("QOS_SUSTAINABILITY threshold crossed (DESCENDING): ", reason)
+					} else {
+						log.Print("QOS_SUSTAINABILITY threshold crossed (ASCENDING): ", reason)
+					}
+					eventNotif, err := fillEventNotification(ctx, eventSub)
+					if err != nil {
+						log.Print(err)
+						break loop
+					}
+					if err = sendNotification(ctx, eventNotif, notificationURI); err != nil {
+						log.Print(err)
+						break loop
+					}
+				}
+				time.Sleep(thresholdPollInterval(eventSub))
+
 			default:
-				// TODO - implement THRESHOLD case
 				log.Print("Not implemented yet")
 				break loop
 			}
@@ -190,6 +245,14 @@ func fillEventNotification(ctx context.Context,
 			return eventNotif, err
 		}
 		eventNotif.UeMobs = UeMobData
+
+	case NWDAFEVENT_QOS_SUSTAINABILITY:
+
+		qosSustainData, err := getQosSustainNotifData(eventSub)
+		if err != nil {
+			return eventNotif, err
+		}
+		eventNotif.QosSustainInfos = qosSustainData
 
 	case NWDAFEVENT_ABNORMAL_BEHAVIOUR:
 
@@ -531,4 +594,15 @@ func requestAbnorBehavrsEngine(
 		Ratio: abnorBehavrsResp.Ratio,
 	}
 	return abnormalBehaviour, nil
+}
+
+// ------------------------------------------------------------------------------
+// thresholdPollInterval - how often to re-evaluate a THRESHOLD subscription.
+// repetitionPeriod is optional for THRESHOLD, so fall back to something shorter
+// than the UPF's 30 s reporting period, which is what actually paces the data.
+func thresholdPollInterval(eventSub EventSubscription) time.Duration {
+	if eventSub.RepetitionPeriod > 0 {
+		return time.Duration(eventSub.RepetitionPeriod) * time.Second
+	}
+	return 10 * time.Second
 }

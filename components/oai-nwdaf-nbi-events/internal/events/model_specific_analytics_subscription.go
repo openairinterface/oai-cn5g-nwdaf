@@ -24,6 +24,12 @@ type SpecificAnalyticsSubscription struct {
 
 // AssertSpecificAnalyticsSubscriptionRequired checks if the required fields are not zero-ed
 func AssertSpecificAnalyticsSubscriptionRequired(obj SpecificAnalyticsSubscription) error {
+	// nwdafEvSub is an optional pointer, so dereferencing it unconditionally
+	// panics for every request that omits prevSub -- which is every ordinary
+	// one. Nothing inside is required when it is absent.
+	if obj.NwdafEvSub == nil {
+		return nil
+	}
 	if err := AssertNnwdafEventsSubscription1Required(*obj.NwdafEvSub); err != nil {
 		return err
 	}

@@ -48,8 +48,14 @@ func AssertNnwdafEventsSubscriptionRequired(obj NnwdafEventsSubscription) error 
 			return err
 		}
 	}
-	if err := AssertReportingInformationRequired(obj.EvtReq); err != nil {
-		return err
+	// evtReq is optional (TS 29.520 NnwdafEventsSubscription), but its nested
+	// TimeWindow marks startTime/stopTime required. Asserting through an absent
+	// evtReq therefore rejects a perfectly legal body, which is what made PUT
+	// return 422 while POST -- which does not validate at all -- accepted it.
+	if !IsZeroValue(obj.EvtReq) {
+		if err := AssertReportingInformationRequired(obj.EvtReq); err != nil {
+			return err
+		}
 	}
 	for _, el := range obj.EventNotifications {
 		if err := AssertEventNotificationRequired(el); err != nil {

@@ -28,6 +28,7 @@ type EventsConfig struct {
 		UeComm              string `envconfig:"ENGINE_UE_COMMUNICATION_ROUTE"`
 		UeMob               string `envconfig:"ENGINE_UE_MOBILITY_ROUTE"`
 		UnexpectedLargeRate string `envconfig:"ENGINE_UNEXPECTED_LARGE_RATE_FLOW_ROUTE"`
+		QosSustain          string `envconfig:"ENGINE_QOS_SUSTAINABILITY_ROUTE"`
 	}
 	Engine struct {
 		Uri    string `envconfig:"ENGINE_URI"`

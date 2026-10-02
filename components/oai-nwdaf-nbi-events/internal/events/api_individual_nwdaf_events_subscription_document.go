@@ -56,6 +56,12 @@ func (c *IndividualNWDAFEventsSubscriptionDocumentApiController) Routes() Routes
 			c.DeleteNWDAFEventsSubscription,
 		},
 		{
+			"GetNWDAFEventsSubscription",
+			strings.ToUpper("Get"),
+			"/nnwdaf-eventssubscription/v1/subscriptions/{subscriptionId}",
+			c.GetNWDAFEventsSubscription,
+		},
+		{
 			"UpdateNWDAFEventsSubscription",
 			strings.ToUpper("Put"),
 			"/nnwdaf-eventssubscription/v1/subscriptions/{subscriptionId}",
@@ -100,5 +106,16 @@ func (c *IndividualNWDAFEventsSubscriptionDocumentApiController) UpdateNWDAFEven
 		return
 	}
 	// If no error, encode the body and the result code
+	EncodeJSONResponse(result.Body, &result.Code, result.Headers, w)
+}
+
+// GetNWDAFEventsSubscription - read one subscription (see the service comment).
+func (c *IndividualNWDAFEventsSubscriptionDocumentApiController) GetNWDAFEventsSubscription(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	result, err := c.service.GetNWDAFEventsSubscription(r.Context(), params["subscriptionId"])
+	if err != nil {
+		c.errorHandler(w, r, err, &result)
+		return
+	}
 	EncodeJSONResponse(result.Body, &result.Code, result.Headers, w)
 }

@@ -33,6 +33,7 @@ services:
             - ENGINE_SESS_SUCC_RATIO_ROUTE=/network_performance/sess_succ_ratio
             - ENGINE_UE_COMMUNICATION_ROUTE=/ue_communication
             - ENGINE_UE_MOBILITY_ROUTE=/ue_mobility
+            - ENGINE_QOS_SUSTAINABILITY_ROUTE=/qos_sustainability
             - SERVER_ADDR=0.0.0.0:8080
         ports:
             - "6059:8080"
@@ -54,6 +55,7 @@ services:
             - ENGINE_SESS_SUCC_RATIO_ROUTE=/network_performance/sess_succ_ratio
             - ENGINE_UE_COMMUNICATION_ROUTE=/ue_communication
             - ENGINE_UE_MOBILITY_ROUTE=/ue_mobility
+            - ENGINE_QOS_SUSTAINABILITY_ROUTE=/qos_sustainability
             - ENGINE_UNEXPECTED_LARGE_RATE_FLOW_ROUTE=/abnormal_behaviour/unexpected_large_rate_flow
             - SERVER_ADDR=0.0.0.0:8080
         ports:
@@ -94,6 +96,7 @@ services:
             - ENGINE_SESS_SUCC_RATIO_ROUTE=/network_performance/sess_succ_ratio
             - ENGINE_UE_COMMUNICATION_ROUTE=/ue_communication
             - ENGINE_UE_MOBILITY_ROUTE=/ue_mobility
+            - ENGINE_QOS_SUSTAINABILITY_ROUTE=/qos_sustainability
             - SERVER_ADDR=0.0.0.0:8080
         ports:
             - "6063:8080"
@@ -161,7 +164,9 @@ services:
             - AMF_NOTIFICATION_FORWARD_ROUTE=/sbi/notification/amf
             - SMF_IP_ADDR=http://192.168.70.133:8080
             - SMF_HTTP_VERSION=2
-            - SMF_SUBSCR_ROUTE=/nsmf_event-exposure/v1
+            # The OAI SMF serves this with a hyphen (nsmf-event-exposure);
+            # TS 29.508 spells it nsmf_event-exposure, which 404s here.
+            - SMF_SUBSCR_ROUTE=/nsmf-event-exposure/v1
             - SMF_API_ROUTE=/test/smf
             - SMF_NOTIFY_CORRELATION_ID=string
             - SMF_NOTIFICATION_ID=2

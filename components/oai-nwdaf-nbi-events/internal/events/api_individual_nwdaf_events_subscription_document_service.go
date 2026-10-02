@@ -10,7 +10,7 @@ package events
 
 import (
 	"context"
-	"errors"
+	"log"
 	"net/http"
 )
 
@@ -35,6 +35,7 @@ func (s *IndividualNWDAFEventsSubscriptionDocumentApiService) DeleteNWDAFEventsS
 	if ok {
 		close(subscriptionCh)
 		delete(subscriptionTable, subscriptionId)
+		delete(subscriptionData, subscriptionId)
 
 		return Response(204, nil), nil
 	}
@@ -42,61 +43,53 @@ func (s *IndividualNWDAFEventsSubscriptionDocumentApiService) DeleteNWDAFEventsS
 }
 
 // UpdateNWDAFEventsSubscription - Update an existing Individual NWDAF Events Subscription
+//
+// Replaces the subscription in place, keeping its id (TS 29.520 §5.2.3): stop
+// the goroutines watching the old criteria, then start new ones from the
+// supplied body. Editing a threshold therefore does not change the URI the
+// consumer already holds.
 func (s *IndividualNWDAFEventsSubscriptionDocumentApiService) UpdateNWDAFEventsSubscription(
 	ctx context.Context,
 	subscriptionId string,
 	nnwdafEventsSubscription NnwdafEventsSubscription,
 ) (ImplResponse, error) {
-	// TODO - update UpdateNWDAFEventsSubscription with the required logic for this service method.
-	// Add api_individual_nwdaf_events_subscription_document_service.go to the .openapi-generator-ignore to avoid overwriting this service implementation when updating open api generation.
+	oldCh, ok := subscriptionTable[subscriptionId]
+	if !ok {
+		return Response(http.StatusNotFound, ProblemDetails{}), nil
+	}
+	close(oldCh)
 
-	//TODO: Uncomment the next line to return response Response(200, NnwdafEventsSubscription{}) or use other options such as http.Ok ...
-	//return Response(200, NnwdafEventsSubscription{}), nil
+	subscriptionCh := make(chan string)
+	subscriptionTable[subscriptionId] = subscriptionCh
+	subscriptionData[subscriptionId] = nnwdafEventsSubscription
+	for _, eventSub := range nnwdafEventsSubscription.EventSubscriptions {
+		go handleSubscriptionEvent(ctx,
+			eventSub,
+			nnwdafEventsSubscription.NotificationURI,
+			subscriptionId,
+			subscriptionCh,
+		)
+	}
+	log.Print("Updated subscription ", subscriptionId)
+	return Response(200, NnwdafEventsSubscription{
+		EventSubscriptions: nnwdafEventsSubscription.EventSubscriptions,
+	}), nil
+}
 
-	//TODO: Uncomment the next line to return response Response(204, {}) or use other options such as http.Ok ...
-	//return Response(204, nil),nil
-
-	//TODO: Uncomment the next line to return response Response(307, RedirectResponse{}) or use other options such as http.Ok ...
-	//return Response(307, RedirectResponse{}), nil
-
-	//TODO: Uncomment the next line to return response Response(308, RedirectResponse{}) or use other options such as http.Ok ...
-	//return Response(308, RedirectResponse{}), nil
-
-	//TODO: Uncomment the next line to return response Response(400, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(400, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(401, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(401, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(403, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(403, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(404, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(404, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(411, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(411, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(413, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(413, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(415, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(415, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(429, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(429, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(500, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(500, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(501, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(501, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(503, ProblemDetails{}) or use other options such as http.Ok ...
-	//return Response(503, ProblemDetails{}), nil
-
-	//TODO: Uncomment the next line to return response Response(0, {}) or use other options such as http.Ok ...
-	//return Response(0, nil),nil
-
-	return Response(http.StatusNotImplemented, nil), errors.New("UpdateNWDAFEventsSubscription method not implemented")
+// GetNWDAFEventsSubscription - Read an existing Individual NWDAF Events Subscription.
+//
+// Not in TS 29.520, which offers only PUT and DELETE on this resource. Added
+// because subscriptions live in memory: after an NWDAF restart a consumer's
+// stored subscription id silently refers to nothing, and PUT -- the only other
+// probe -- restarts the evaluation goroutine as a side effect, which resets
+// threshold state. A plain read lets a consumer reconcile without disturbing it.
+func (s *IndividualNWDAFEventsSubscriptionDocumentApiService) GetNWDAFEventsSubscription(
+	ctx context.Context,
+	subscriptionId string,
+) (ImplResponse, error) {
+	sub, ok := subscriptionData[subscriptionId]
+	if !ok {
+		return Response(http.StatusNotFound, ProblemDetails{}), nil
+	}
+	return Response(200, sub), nil
 }

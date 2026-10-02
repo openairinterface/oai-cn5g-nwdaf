@@ -109,7 +109,10 @@ type CustomUsageReport struct {
 }
 
 type CustomizedData struct {
-	UsageReport CustomUsageReport `json:"Usage Report,omitempty"`
+	// The SMF sends this key without a space ("UsageReport"). With the old
+	// "Usage Report" tag the field never matched, so every usage report
+	// decoded to zero volume while the real numbers were on the wire.
+	UsageReport CustomUsageReport `json:"UsageReport,omitempty"`
 	Event       string            `json:"event,omitempty"`
 	TimeStamp   string            `json:"timeStamp,omitempty"`
 }

@@ -26,6 +26,7 @@ type EngineConfig struct {
 		SessSuccRatio string `envconfig:"ENGINE_SESS_SUCC_RATIO_ROUTE"`
 		UeComm        string `envconfig:"ENGINE_UE_COMMUNICATION_ROUTE"`
 		UeMob         string `envconfig:"ENGINE_UE_MOBILITY_ROUTE"`
+		QosSustain    string `envconfig:"ENGINE_QOS_SUSTAINABILITY_ROUTE"`
 	}
 	Database struct {
 		Uri               string `envconfig:"MONGODB_URI"`
@@ -79,4 +80,28 @@ type UeCommResp struct {
 	UlVolVariance float32   `json:"ulVolVariance,omitempty"`
 	DlVol         int64     `json:"dlVol,omitempty"`
 	DlVolVariance float32   `json:"dlVolVariance,omitempty"`
+}
+
+// ------------------------------------------------------------------------------
+// Type of qos_sustainability response from engine.
+//
+// Throughput is what we can observe from the UPF usage reports; the NBI turns
+// it into the 3GPP QosSustainabilityInfo by comparing against ranUeThrouThd.
+type QosSustainUe struct {
+	Supi           string `json:"supi,omitempty"`
+	UeIpv4         string `json:"ueIpv4,omitempty"`
+	Reports        int32  `json:"reports"`
+	LastTs         int64  `json:"lastTs,omitempty"`
+	LastDlThrouBps int64  `json:"lastDlThrouBps"`
+	LastUlThrouBps int64  `json:"lastUlThrouBps"`
+	AvgDlThrouBps  int64  `json:"avgDlThrouBps"`
+	AvgUlThrouBps  int64  `json:"avgUlThrouBps"`
+}
+
+type QosSustainResp struct {
+	Ts            time.Time      `json:"ts"`
+	Ues           []QosSustainUe `json:"ues,omitempty"`
+	MinDlThrouBps int64          `json:"minDlThrouBps"`
+	MinUlThrouBps int64          `json:"minUlThrouBps"`
+	Confidence    int32          `json:"confidence"`
 }

@@ -21,5 +21,6 @@ func NewRouter() http.Handler {
 	mux.HandleFunc(config.Routes.SessSuccRatio, nwPerfNumOfPdu)
 	mux.HandleFunc(config.Routes.UeComm, ueComm)
 	mux.HandleFunc(config.Routes.UeMob, ueMob)
+	mux.HandleFunc(config.Routes.QosSustain, qosSustain)
 	return mux
 }

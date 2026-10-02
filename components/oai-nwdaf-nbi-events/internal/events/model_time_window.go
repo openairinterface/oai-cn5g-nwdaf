@@ -25,6 +25,14 @@ type TimeWindow struct {
 
 // AssertTimeWindowRequired checks if the required fields are not zero-ed
 func AssertTimeWindowRequired(obj TimeWindow) error {
+	// A TimeWindow is reached through half a dozen OPTIONAL parents
+	// (anaMetaInd.dataWindow, congestionInfo.timeIntev, dnPerf.temporalValidCon,
+	// ...). The generated asserts recurse into those parents even when they were
+	// not supplied, so an absent window would be rejected for missing the
+	// startTime it never had. Treat a wholly zero window as absent.
+	if IsZeroValue(obj) {
+		return nil
+	}
 	elements := map[string]interface{}{
 		"startTime": obj.StartTime,
 		"stopTime":  obj.StopTime,

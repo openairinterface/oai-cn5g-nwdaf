@@ -10,8 +10,16 @@
 package events
 
 // MatchingDirection - Possible values are   - ASCENDING: Threshold is crossed in ascending direction.   - DESCENDING: Threshold is crossed in descending direction.   - CROSSED: Threshold is crossed either in ascending or descending direction.
-type MatchingDirection struct {
-}
+type MatchingDirection string
+
+// The generator collapsed this anyOf into an empty struct, which cannot hold a
+// value -- a subscription carrying "matchingDir": "DESCENDING" failed to
+// unmarshal. It is a string enum, like NotificationMethod and NwdafEvent.
+const (
+	MATCHINGDIRECTION_ASCENDING  MatchingDirection = "ASCENDING"
+	MATCHINGDIRECTION_DESCENDING MatchingDirection = "DESCENDING"
+	MATCHINGDIRECTION_CROSSED    MatchingDirection = "CROSSED"
+)
 
 // AssertMatchingDirectionRequired checks if the required fields are not zero-ed
 func AssertMatchingDirectionRequired(obj MatchingDirection) error {
