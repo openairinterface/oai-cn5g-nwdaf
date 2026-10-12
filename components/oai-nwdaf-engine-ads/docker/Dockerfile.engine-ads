@@ -2,12 +2,13 @@
 # * SPDX-License-Identifier: LicenseRef-CSSL-1.0
 # */
 
-FROM python:3.6.9-slim AS oai-nwdaf-engine-ads
+# The autoencoder runs in numpy (src/autoencoder.py), so no TensorFlow here.
+FROM python:3.12-slim AS oai-nwdaf-engine-ads
 WORKDIR /app
 COPY requirements.txt .
-RUN pip install --no-color --upgrade "pip<22" "setuptools<60" "wheel<0.38" && \
-    pip install --no-cache-dir -r requirements.txt --no-color && \
-    pip cache purge
+RUN pip install --no-cache-dir --no-color -r requirements.txt
 COPY . .
+# Fail the build if inference drifts from the Keras reference.
+RUN python3 test_autoencoder.py
 EXPOSE 8080/tcp
 CMD [ "python3", "run.py" ]

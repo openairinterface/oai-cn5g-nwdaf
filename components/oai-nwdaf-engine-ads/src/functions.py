@@ -2,30 +2,21 @@
 
 # This file contains utils functions.
 
-import pandas as pd
+from datetime import datetime, timezone
 from src.config import *
 
-def add_time_columns(df, timestamp_col):
-    df['timestamp'] = pd.to_datetime(df[timestamp_col], unit='s')
-    df['year'] = df['timestamp'].dt.year
-    df['month'] = df['timestamp'].dt.month
-    df['day'] = df['timestamp'].dt.day
-    df['hour'] = df['timestamp'].dt.hour
-    df['minute'] = df['timestamp'].dt.minute
-    return df
-
 def create_dataframe():
+    """Usage reports from the SMF collection, oldest first, one dict per report."""
     data = []
     for doc in smf_collection.find():
         for qosmon in doc['qosmonlist']:
+            ts = float(qosmon['timestamp'])
             data.append({
-                "timestamp": qosmon['timestamp'],
+                "timestamp": ts,
+                "hour": datetime.fromtimestamp(ts, timezone.utc).hour,
                 "pduseid": qosmon['pduseid'],
                 "value_ul": qosmon['customized_data']['usagereport']['volume']['uplink'] ,
                 "value_dl": qosmon['customized_data']['usagereport']['volume']['downlink'],
                 "value_total": qosmon['customized_data']['usagereport']['volume']['total']
             })
-    # Create a pandas dataframe
-    df = pd.DataFrame(data)
-    df = add_time_columns(df, 'timestamp')
-    return df
+    return data
