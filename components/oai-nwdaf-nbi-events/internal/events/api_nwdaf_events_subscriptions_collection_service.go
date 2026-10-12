@@ -395,8 +395,7 @@ func sendNotification(
 ) error {
 	log.Print("Sending notification to client")
 	jsonStr, _ := json.Marshal(eventNotif)
-	_, err := http.Post(notificationURI, "application/json", bytes.NewBuffer(jsonStr))
-	return err
+	return postNotification(notificationURI, jsonStr)
 }
 
 // ------------------------------------------------------------------------------
