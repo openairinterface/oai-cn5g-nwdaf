@@ -16,6 +16,8 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
 	"github.com/openairinterface/oai-cn5g-nwdaf/components/oai-nwdaf-nbi-events/internal/events"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 type MainConfig struct {
@@ -61,7 +63,8 @@ func main() {
 	)
 	server := &http.Server{
 		Addr:         config.Server.Addr,
-		Handler:      router,
+		// HTTP/1.1 for the NBI gateway and AFs, h2c for SBI consumers (NEF)
+		Handler:      h2c.NewHandler(router, &http2.Server{}),
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
 	}
